@@ -7,14 +7,16 @@
 #define NUM_MODULES 1
 
 // SPI Commands
-const byte PING = 0x00;
-const byte START = 0xFF;
-const byte TX_RAND = 0xF0;
-const byte TIME = 0x30;
-const byte STRIKE = 0x50;
+const byte PING = 0x11;
+const byte TX_RAND = 0x22;
+const byte TIME = 0x44; // First TIME cmd will start each module
+const byte STATUS = 0x80;
 
 // SPI responses
-const byte READY = 0xC0;
+const byte READY = 0x30;
+const byte ACTIVE = 0x60;
+const byte SOLVED = 0xC0;
+const byte STRIKE_MASK = 0x03;
 
 // All the random components of this game
 struct game_rand_t {
@@ -22,7 +24,7 @@ struct game_rand_t {
   char model[MODEL_LEN];
   byte indicators;
 
-  void print_rand(){
+  void print_rand() {
     Serial.write("SN:");
     Serial.write(sn, SN_LEN);
     Serial.write(", Model:");
@@ -32,6 +34,12 @@ struct game_rand_t {
   }
 };
 game_rand_t game_rand;
+
+// How many strikes the game has had
+byte strikes;
+
+// Entire time of the game
+unsigned long game_time;
 
 // Pins
 // Pins for SS of each slave
@@ -82,7 +90,7 @@ void tx_rand(int slave_idx) {
   // Copy rand data to buffer so as not to mutilate it
   game_rand_t out_buf;
   memcpy(&out_buf, &game_rand, sizeof(game_rand_t));
-  
+
   digitalWrite(slave_pins[slave_idx], LOW);
   byte resp = SPI.transfer(TX_RAND);
   SPI.transfer(&out_buf, sizeof(game_rand_t));
@@ -92,8 +100,11 @@ void tx_rand(int slave_idx) {
 
 void loop (void) {
   bool slave_on[NUM_MODULES] = {false};
+  byte num_strikes[NUM_MODULES] = {0};
 
   gen_rand();
+  strikes = 0;
+  game_time = 300000; // 5 minutes
 
   Serial.println("Establishing connections");
   // Try to establish connection with each module a few times a second
@@ -122,34 +133,38 @@ void loop (void) {
   }
 
   Serial.println("Starting");
+  unsigned long start_time = millis();
+  // Time left in the game
+  unsigned long millis_left = start_time;
 
-  for (int i = 0; i < NUM_MODULES; i++) {
-    digitalWrite(slave_pins[i], LOW);
-    byte resp = SPI.transfer(START);
-    digitalWrite(slave_pins[i], HIGH);
-  }
-
-  Serial.println("Running");
-  while(1);
-  /*
-  //digitalWrite(slave_pins[slave_idx], LOW);
-  SPI.transfer(TX_SN);
-  delay(1000);
-  //Serial.println(sn);
-  //SPI.transfer(sn, 6);
-  delay(1000);
-  SPI.transfer(START);
-  //digitalWrite(slave_pins[slave_idx], HIGH);
-
-  Serial.println("Done");
-  unsigned long t = millis();
   while (1) {
-    bool s = LOW;
-    if (millis() - t >= 1000) {
-      t += 1000;
-      digitalWrite(7, s);
-      s = !s;
+    delay(100);
+
+    // Update each module's timer and check their status
+    for (int i = 0; i < NUM_MODULES; i++) {
+      digitalWrite(slave_pins[i], LOW);
+      millis_left = game_time - (millis() - start_time);
+      byte resp = SPI.transfer(TIME);
+      SPI.transfer(&millis_left, sizeof(long));
+      digitalWrite(slave_pins[i], HIGH);
+
+      byte mod_strikes = resp & STRIKE_MASK;
+      if (mod_strikes < num_strikes[i]) {
+        // Strikes decreased, error or mistransmission
+        Serial.print("Error: strikes decreased for module ");
+        Serial.println(i);
+      } else if (mod_strikes > num_strikes[i]) {
+        strikes += mod_strikes - num_strikes[i];
+        Serial.print("Module ");
+        Serial.print(i);
+        Serial.println(" striked");
+      }
+    }
+
+    if (millis_left <= 0) {
+      Serial.println("Ran out of time");
+    } else if (strikes >= 3) {
+      Serial.println("Striked out");
     }
   }
-  */
 }

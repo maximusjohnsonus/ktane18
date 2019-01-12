@@ -6,15 +6,17 @@
 #define NUM_MODULES 1
 
 // SPI Commands
-const byte PING = 0x00;
+const byte PING = 0x11;
 const byte START = 0xFF;
-const byte TX_RAND = 0xF0;
-const byte TIME = 0x30;
-const byte STRIKE = 0x50;
+const byte TX_RAND = 0x22;
+const byte TIME = 0x44;
+const byte STATUS = 0x80;
 
 // SPI responses
-const byte READY = 0xC0;
-volatile int rand_idx;
+const byte READY = 0x30;
+const byte ACTIVE = 0x60;
+const byte SOLVED = 0xC0;
+const byte STRIKE_MASK = 0x03;
 
 // All the random components of this game
 struct game_rand_t {
@@ -32,10 +34,21 @@ struct game_rand_t {
   }
 };
 game_rand_t game_rand;
+volatile int rand_idx;
 
-enum state_t {READY_S, RX_RAND_S, RUN_S};
+// How many strikes the module has had
+byte strikes;
+
+// Status to send to head node
+byte my_status; // Arduino has the worst reserved keywords
+
+// Time left on the timer (in ms)
+unsigned long millis_left;
+volatile int time_idx;
+
+enum state_t {READY_S, RX_RAND_S, RX_TIME_S, RUN_S};
 state_t state;
-
+bool new_state = false;
 
 void setup (void) {
   Serial.begin(9600);
@@ -49,55 +62,70 @@ void setup (void) {
 
   // turn on interrupts
   SPCR |= _BV(SPIE);
-
-  rand_idx = 0;
-  state = READY_S;
-  SPDR = READY;
 }
 
+inline void update_spdr() {
+  SPDR = my_status | strikes;
+}
 
 // SPI interrupt routine
 ISR (SPI_STC_vect) {
   byte c = SPDR;
-  SPDR = READY;
+  update_spdr();
 
   if (state == RX_RAND_S) {
     ((byte *)&game_rand)[rand_idx] = c;
     rand_idx++;
     if (rand_idx == sizeof(game_rand_t)) {
       state = READY_S;
+      new_state = true;
+    }
+  } else if (state == RX_TIME_S) {
+    ((byte *)&millis_left)[time_idx] = c;
+    time_idx++;
+    if (time_idx == sizeof(long)) {
+      state = RUN_S;
+      new_state = true;
     }
   } else if (c == TX_RAND) {
     state = RX_RAND_S;
+    new_state = true;
     rand_idx = 0;
-  } else if (c == START) {
-    state = RUN_S;
+  } else if (c == TIME) {
+    state = RX_TIME_S;
+    new_state = true;
+    time_idx = 0;
   }
 }
 
 void loop (void) {
-  if (state == READY_S) {
-    if (rand_idx == sizeof(game_rand)) {
-      game_rand.print_rand();
-      rand_idx = 0;
-    } else {
-      Serial.print(".");
-      delay(1000);
+  state = READY_S;
+  my_status = READY;
+  strikes = 0;
+  update_spdr();
+
+  while (1) {
+    // On a state change
+    if (new_state) {
+      if (state == READY_S) {
+        game_rand.print_rand();
+      } /* else if (state == BLINK) {
+        while (1) {
+          digitalWrite(7, HIGH);
+          delay(1000);
+          digitalWrite(7, LOW);
+          delay(1000);
+        }
+      } */
     }
-  } else if (state == RX_RAND_S) {
-    Serial.print("Waiting for rand... ");
-    Serial.println(rand_idx);
-    delay(1000);
-  } else if (state == RUN_S) {
-    Serial.println("Running");
-    delay(1000);
-  }/*else if (state == BLINK) {
+
+    // Always
+    if (state == RUN_S) {
+      if (Serial.available() and Serial.read() == 'x') {
+        Serial.println("Striking");
+        strikes++;
+        update_spdr();
+      }
+    }
   }
-    while (1) {
-      digitalWrite(7, HIGH);
-      delay(1000);
-      digitalWrite(7, LOW);
-      delay(1000);
-    }
-  }*/
 }
