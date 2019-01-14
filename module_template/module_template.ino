@@ -1,9 +1,18 @@
+// Uno pins 
+// MOSI: 11 or ICSP-4
+// MISO: 12 or ICSP-1
+// SCK:  13 or ICSP-3
+// SS (slave): 10 
+
+
+
 #include <Wire.h>
 #include "pins_arduino.h"
 
 #define SN_LEN 6
 #define MODEL_LEN 4
 #define NUM_MODULES 1
+
 
 // SPI Commands
 const byte PING = 0x11;
@@ -26,9 +35,9 @@ struct game_rand_t {
 
   void print_rand() {
     Serial.write("SN:");
-    Serial.write(sn, SN_LEN);
+    Serial.write((unsigned char*)sn, SN_LEN);
     Serial.write(", Model:");
-    Serial.write(model, MODEL_LEN);
+    Serial.write((unsigned char*)model, MODEL_LEN);
     Serial.write(", IND:");
     Serial.println((int)indicators, BIN);
   }
@@ -52,6 +61,7 @@ bool new_state = false;
 
 void setup (void) {
   Serial.begin(9600);
+  Serial.println("MODULE v0.01 alpha");
 
   // Don't grab MISO until selectesd
   pinMode(MISO, OUTPUT); //todo input

@@ -1,3 +1,11 @@
+// Mega pins
+// MOSI: 51 or ICSP-4
+// MISO: 50 or ICSP-1
+// SCK:  52 or ICSP-3
+// SS (slave): 10 
+
+
+
 #include <SPI.h>
 #include <Wire.h>
 #include "pins_arduino.h"
@@ -7,7 +15,7 @@
 #define NUM_MODULES 1
 
 // SPI Commands
-const byte PING = 0x11;
+const byte PING_ = 0x11;
 const byte TX_RAND = 0x22;
 const byte TIME = 0x44; // First TIME cmd will start each module
 const byte STATUS = 0x80;
@@ -26,9 +34,9 @@ struct game_rand_t {
 
   void print_rand() {
     Serial.write("SN:");
-    Serial.write(sn, SN_LEN);
+    Serial.write((unsigned char*)sn, SN_LEN);
     Serial.write(", Model:");
-    Serial.write(model, MODEL_LEN);
+    Serial.write((unsigned char*)model, MODEL_LEN);
     Serial.write(", IND:");
     Serial.println((int)indicators, BIN);
   }
@@ -53,6 +61,7 @@ void setup (void) {
   SPI.setClockDivider(SPI_CLOCK_DIV16);
 
   Serial.begin(9600);
+  Serial.println("HEAD v0.01 alpha");
 }
 
 void gen_rand() {
@@ -113,7 +122,7 @@ void loop (void) {
 
     for (int i = 0; i < NUM_MODULES; i++) {
       digitalWrite(slave_pins[i], LOW);
-      byte resp = SPI.transfer(PING);
+      byte resp = SPI.transfer(PING_);
       digitalWrite(slave_pins[i], HIGH);
 
       if (slave_on[i] != (resp == READY)) {
