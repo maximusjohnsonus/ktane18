@@ -50,12 +50,20 @@ enum state_t {READY_S, RX_RAND_S, RX_TIME_S, RUN_S};
 state_t state;
 bool new_state = false;
 
+void get_miso(){
+  if(digitalRead(SS) == LOW){
+    pinMode(MISO, OUTPUT);
+  } else {
+    pinMode(MISO, INPUT);
+  }
+}
 void setup (void) {
   Serial.begin(9600);
 
   // Don't grab MISO until selectesd
   pinMode(MISO, OUTPUT); //todo input
-  pinMode(7, OUTPUT);
+  // TODO: ISR to set MISO to OUTPUT when SS goes LOW
+  //attachInterrupt(digitalPinToInterrupt(ss_pin), get_miso, CHANGE);
 
   // turn on SPI in slave mode
   SPCR |= _BV(SPE);
@@ -109,6 +117,8 @@ void loop (void) {
     if (new_state) {
       if (state == READY_S) {
         game_rand.print_rand();
+      } else if (state == RUN_S){
+        // Something with time
       } /* else if (state == BLINK) {
         while (1) {
           digitalWrite(7, HIGH);
