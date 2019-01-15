@@ -21,9 +21,15 @@ byte my_status; // Arduino has the worst reserved keywords
 unsigned long millis_left;
 volatile int time_idx;
 
-enum state_t {READY_S, RX_RAND_S, RX_TIME_S, RUN_S};
+enum state_t {
+  STATE_READY,       // Game hasn't started
+  STATE_RUN,         // Game running
+  STATE_READ_INIT,
+  STATE_READ_INFO
+};
+
 state_t state;
-bool new_state = false;
+byte pos;
 
 void setup (void) {
   Serial.begin(9600);
@@ -31,77 +37,51 @@ void setup (void) {
 
   // Don't grab MISO until selectesd
   pinMode(MISO, OUTPUT); //todo input
-  pinMode(7, OUTPUT);
 
   // turn on SPI in slave mode
   SPCR |= _BV(SPE);
 
   // turn on interrupts
   SPCR |= _BV(SPIE);
+
+  strikes = 0;
+  pos = 0;
+  state = STATE_READY;
 }
 
 inline void update_spdr() {
-  SPDR = my_status | strikes;
+  SPDR |= strikes;
 }
 
 // SPI interrupt routine
 ISR (SPI_STC_vect) {
   byte c = SPDR;
-  update_spdr();
-
-  if (state == RX_RAND_S) {
-    ((byte *)&game_rand)[rand_idx] = c;
-    rand_idx++;
-    if (rand_idx == sizeof(game_rand_t)) {
-      state = READY_S;
-      new_state = true;
+  if (state == STATE_READY) {
+    if (c == CMD_PING) {
+      //Serial.println("Received PING");
+      SPDR = RSP_READY;
     }
-  } else if (state == RX_TIME_S) {
-    ((byte *)&millis_left)[time_idx] = c;
-    time_idx++;
-    if (time_idx == sizeof(long)) {
-      state = RUN_S;
-      new_state = true;
+    if (c == CMD_INIT) {
+      state = STATE_READ_INIT;
     }
-  } else if (c == TX_RAND) {
-    state = RX_RAND_S;
-    new_state = true;
-    rand_idx = 0;
-  } else if (c == TIME) {
-    state = RX_TIME_S;
-    new_state = true;
-    time_idx = 0;
   }
+  else if (state == STATE_READ_INIT){
+    ((char[])&game_rand)[pos] = c;
+    ++pos;
+    if (pos == sizeof(game_rand)) {
+      pos = 0;
+      state = STATE_RUN;
+    }
+  }
+  
+  Serial.print("Received SPI byte ");
+  Serial.println(c, HEX);
+
+  SPDR = RSP_READY;
+  //update_spdr();
+  Serial.print("Sending SPDR ");
+  Serial.println(SPDR);
 }
 
 void loop (void) {
-  state = READY_S;
-  my_status = READY;
-  strikes = 0;
-  update_spdr();
-
-  while (1) {
-    // On a state change
-    if (new_state) {
-      if (state == READY_S) {
-        game_rand.print_rand();
-      } /* else if (state == BLINK) {
-        while (1) {
-          digitalWrite(7, HIGH);
-          delay(1000);
-          digitalWrite(7, LOW);
-          delay(1000);
-        }
-      } */
-    }
-
-    // Always
-    if (state == RUN_S) {
-      if (Serial.available() and Serial.read() == 'x') {
-        Serial.println("Striking");
-        strikes++;
-        update_spdr();
-      }
-    }
-  }
 }

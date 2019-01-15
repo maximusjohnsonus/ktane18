@@ -8,15 +8,15 @@
 #define NUM_MODULES 1
 
 // SPI Commands
-const byte PING_ = 0x11;
-const byte TX_RAND = 0x22;
-const byte TIME = 0x44; // First TIME cmd will start each module
-const byte STATUS = 0x80;
+const byte CMD_PING = 0x01;
+const byte CMD_INIT = 0x02;
+const byte CMD_INFO = 0x03;
+//const byte STATUS = 0x40;
 
 // SPI responses
-const byte READY = 0x30;
-const byte ACTIVE = 0x60;
-const byte SOLVED = 0xC0;
+const byte RSP_READY = 0x10;
+const byte RSP_ACTIVE = 0x20;
+const byte RSP_SOLVED = 0x30;
 const byte STRIKE_MASK = 0x03;
 
 // All the random components of this game
