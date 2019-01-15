@@ -97,18 +97,24 @@ void loop (void) {
     delay(100);
 
     for (int i = 0; i < NUM_MODULES; i++) {
+      if (slave_on[i]) continue;
+
       Serial.print("Sending PING to slave ");
       Serial.println(i);
 
       digitalWrite(slave_pins[i], LOW);
       byte rsp = SPI.transfer(CMD_PING);
       digitalWrite(slave_pins[i], HIGH);
-      Serial.print("Received ");
-      Serial.println(rsp);
+      Serial.print("Received response ");
+      Serial.println(rsp, BIN);
 
-      if (rsp & ~STRIKE_MASK == RSP_READY) {
+      if (rsp == RSP_READY) {
         Serial.print("Received READY from slave ");
         Serial.println(i);
+        slave_on[i] = true;
+
+        Serial.println("Sending INIT");
+        tx_rand(i);
       }
     }
   }

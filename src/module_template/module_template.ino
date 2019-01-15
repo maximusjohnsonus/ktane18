@@ -30,6 +30,20 @@ enum state_t {
 
 state_t state;
 byte pos;
+bool interrupt_called;
+
+struct interrupt_debug_t {
+  byte recv; 
+  void init() {
+    recv = -1;
+  }
+
+  void print_interrupt() {
+    Serial.println("Received SPI byte ");
+    Serial.println(recv, BIN);
+  }
+} int_debug;
+
 
 void setup (void) {
   Serial.begin(9600);
@@ -47,6 +61,7 @@ void setup (void) {
   strikes = 0;
   pos = 0;
   state = STATE_READY;
+  interrupt_called = false;
 }
 
 inline void update_spdr() {
@@ -54,11 +69,12 @@ inline void update_spdr() {
 }
 
 // SPI interrupt routine
+// Serial communication can mess up interrupts, so store debug info elsewhere
 ISR (SPI_STC_vect) {
   byte c = SPDR;
+  int_debug.recv = c;
   if (state == STATE_READY) {
     if (c == CMD_PING) {
-      //Serial.println("Received PING");
       SPDR = RSP_READY;
     }
     if (c == CMD_INIT) {
@@ -68,20 +84,20 @@ ISR (SPI_STC_vect) {
   else if (state == STATE_READ_INIT){
     ((char[])&game_rand)[pos] = c;
     ++pos;
-    if (pos == sizeof(game_rand)) {
+    if (pos == sizeof(game_rand_t)) {
       pos = 0;
       state = STATE_RUN;
+      game_rand.print_rand();
     }
   }
   
-  Serial.print("Received SPI byte ");
-  Serial.println(c, HEX);
-
-  SPDR = RSP_READY;
-  //update_spdr();
-  Serial.print("Sending SPDR ");
-  Serial.println(SPDR);
+  interrupt_called = true;
 }
 
 void loop (void) {
+  if (interrupt_called) {
+    int_debug.print_interrupt();
+    int_debug.init();
+    interrupt_called = false;
+  }
 }
