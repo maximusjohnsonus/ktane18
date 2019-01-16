@@ -37,8 +37,8 @@ struct game_rand_t {
 };
 
 struct game_info_t {
-    byte strikes; // How many strikes the game has had
-    unsigned long game_time; // Entire time of the game
+    byte strikes;            // How many strikes the game has had
+    unsigned long game_time; // Time left on the game timer (ms)
 
     void print_info() {
         Serial.print("Strikes:");

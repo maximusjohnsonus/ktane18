@@ -87,7 +87,7 @@ byte transfer_info(int slave_idx) {
 
     digitalWrite(slave_pins[slave_idx], LOW);
     delay(10);
-    byte rsp = SPI.transfer(CMD_INIT);
+    byte rsp = SPI.transfer(CMD_INFO);
     SPI.transfer(&out_buf, sizeof(game_info_t));
     digitalWrite(slave_pins[slave_idx], HIGH);
     return rsp;

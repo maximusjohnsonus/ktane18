@@ -11,19 +11,18 @@
 #define SS_ISR_PIN 2
 
 game_rand_t game_rand;
-game_info_t game_info;
+game_info_t game_info; // Do not carelessly use game_time; it may be mid-update
+                       // (Instead use last_game_time)
 volatile int pos;
 
 
 // How many strikes the module has had
 byte strikes;
 
-// Status to send to head node
-byte my_status; // Arduino has the worst reserved keywords
-
-// Time left on the timer (in ms)
-unsigned long millis_left;
-volatile int time_idx;
+// Result of millis() when last info was completed
+volatile unsigned long last_info_time;
+// Copy of game_info.game_time that will never be partially-updated
+volatile unsigned long last_game_time;
 
 enum state_t {
     STATE_UNREADY,     // Game need some set up
@@ -33,9 +32,9 @@ enum state_t {
     STATE_READ_INFO    // Reading info from master (time + strikes)
 };
 
-state_t state;
+volatile state_t state;
 volatile bool interrupt_called;
-bool print_info;
+volatile bool print_info;
 
 struct interrupt_debug_t {
     byte recv;
@@ -77,6 +76,9 @@ void setup (void) {
     // Set MISO to OUTPUT when SS goes LOW
     // Docs say only pins 2 and 3 are usable
     attachInterrupt(digitalPinToInterrupt(SS_ISR_PIN), get_miso, CHANGE);
+
+    // Put your hardware setup here (pinMode OUTPUT and all that, set variables later)
+    //@TODO: your code
 }
 
 // Update state and SPDR
@@ -133,8 +135,8 @@ ISR (SPI_STC_vect) {
         pos++;
 
         if (pos == sizeof(game_rand_t)) {
-            pos = 0;
             set_state_spdr(STATE_READY);
+            pos = 0;
             print_info = true;
         } else {
             set_state_spdr(STATE_READ_INIT);
@@ -145,8 +147,13 @@ ISR (SPI_STC_vect) {
         pos++;
 
         if (pos == sizeof(game_info_t)) {
-            pos = 0;
             set_state_spdr(STATE_RUN);
+
+            // Update our timing globals
+            last_game_time = game_info.game_time;
+            last_info_time = millis();
+
+            pos = 0;
             print_info = true;
         } else {
             set_state_spdr(STATE_READ_INFO);
@@ -167,7 +174,10 @@ void loop (void) {
     interrupt_called = false;
     print_info = false;
 
+    //@TODO: your code
+
     // If necessary, wait until game is ready and in a valid physical state
+    //@TODO: your code
 
     // Done with set up, let master know
     set_state_spdr(STATE_READY);
@@ -177,6 +187,7 @@ void loop (void) {
     while (state != STATE_RUN) {
         if (interrupt_called) {
             Serial.println("Interrupt called");
+            Serial.println(state);
 
             int_debug.print_interrupt();
             int_debug.init();
@@ -190,15 +201,39 @@ void loop (void) {
         }
     }
 
-    Serial.println("Starting game");
+    // Put the variables you need across loop iterations here
+    //@TODO: your code
+    // example:
+    unsigned long print_time = millis() + 2000;
 
     // Play the game
+    Serial.println("Starting game");
     while(1){
-        if (Serial.available() and Serial.read() == 'x'){
+        // Time left on the game timer according to this module (ms)
+        const unsigned long local_time = last_game_time - (millis() - last_info_time);
+
+        // Set this to true if the module strikes on this loop
+        bool striked = false;
+
+        // Module code here. DO NOT USE DELAY pls I think it will break things
+        //@TODO: your code
+        // example:
+        if (millis() >= print_time) {
+            Serial.println("This happens once every two seconds!");
+            print_time = millis() + 2000;
+        }
+        striked = Serial.available() and Serial.read() == 'x';
+
+        // End module code
+
+        // Deal with strikes
+        if (striked) {
             Serial.println("Striking");
             strikes++;
+            set_state_spdr(state); // Update strikes in SPDR immediately
         }
 
+        // Debug stuff
         if (interrupt_called) {
             int_debug.print_interrupt();
             int_debug.init();
@@ -209,5 +244,18 @@ void loop (void) {
                 print_info = false;
             }
         }
+
+        // Deal with master strikes
+        if (game_info.strikes >= 3) {
+            Serial.println("Striked out");
+            break;
+        }
+        if (last_game_time == 0) {
+            Serial.println("Ran out of time");
+            break;
+        }
     }
+
+    Serial.println("Game over");
+    delay(2000);
 }
