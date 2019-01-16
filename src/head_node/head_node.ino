@@ -16,6 +16,16 @@ game_info_t game_info;
 unsigned long game_length; // Length of game (ms)
 unsigned long start_time;  // Time of game start (ms)
 
+
+enum slave_state_t {
+    STATE_DISCONNECTED,
+    STATE_READY,
+    STATE_RUN,
+    STATE_NEEDY,
+    STATE_SOLVED
+};
+
+
 // Pins
 // Pins for SS of each slave
 int slave_pins[NUM_MODULES] = {10, 11};
@@ -108,7 +118,7 @@ void update_game_time() {
 void loop(void) {
     Serial.println("Starting run");
 
-    bool slave_on[NUM_MODULES] = {};
+    slave_state_t slave_state[NUM_MODULES] = {};
     byte num_strikes[NUM_MODULES] = {};
 
     gen_rand();
@@ -131,18 +141,18 @@ void loop(void) {
             Serial.print("Received response ");
             Serial.println(rsp_raw, HEX);
 
-            byte rsp_cmd = rsp_raw & (~STRIKE_MASK);
+            byte rsp_state = rsp_raw & (~STRIKE_MASK);
             byte rsp_strikes = rsp_raw & STRIKE_MASK;
 
-            if (rsp_cmd == RSP_READY) {
-                if (!slave_on[i]) {
-                    slave_on[i] = true;
+            if (rsp_state == RSP_READY) {
+                if (slave_state[i] == STATE_DISCONNECTED) {
+                    slave_state[i] = STATE_READY;
 
                     Serial.println("Sending INIT");
                     transfer_rand(i);
                 }
             } else {
-                slave_on[i] = false;
+                slave_state[i] = STATE_DISCONNECTED;
             }
         }
 
@@ -167,7 +177,7 @@ void loop(void) {
 
             byte rsp_raw = transfer_info(i);
 
-            byte rsp_cmd = rsp_raw & (~STRIKE_MASK);
+            byte rsp_state = rsp_raw & (~STRIKE_MASK);
             byte rsp_strikes = rsp_raw & STRIKE_MASK;
 
             if (rsp_strikes > num_strikes[i]){
@@ -177,6 +187,14 @@ void loop(void) {
                 Serial.print("Module ");
                 Serial.print(i);
                 Serial.println(" striked");
+            }
+
+            if (rsp_state == RSP_SOLVED) {
+                if (slave_state[i] != STATE_SOLVED) {
+                    Serial.print("Module solved ");
+                    Serial.println(i);
+                }
+                slave_state[i] = STATE_SOLVED;
             }
         }
 

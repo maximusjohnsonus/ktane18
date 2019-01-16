@@ -16,7 +16,8 @@ const byte CMD_INFO = 0x03;
 const byte RSP_UNREADY = 0x10;
 const byte RSP_READY   = 0x20;
 const byte RSP_ACTIVE  = 0x30;
-const byte RSP_SOLVED  = 0x40;
+const byte RSP_NEEDY   = 0x40;
+const byte RSP_SOLVED  = 0x50;
 const byte RSP_DEBUG   = 0xF0;
 const byte STRIKE_MASK = 0x03;
 

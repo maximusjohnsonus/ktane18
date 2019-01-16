@@ -29,7 +29,8 @@ enum state_t {
     STATE_READY,       // Game hasn't started
     STATE_RUN,         // Game running
     STATE_READ_INIT,   // Reading init data from master (e.g. SN)
-    STATE_READ_INFO    // Reading info from master (time + strikes)
+    STATE_READ_INFO,   // Reading info from master (time + strikes)
+    STATE_SOLVED       // Slave solved 
 };
 
 volatile state_t state;
@@ -182,6 +183,7 @@ void loop (void) {
     state = STATE_UNREADY;
     interrupt_called = false;
     print_info = false;
+    bool solved = false;
 
     //@TODO: your code
 
@@ -195,7 +197,6 @@ void loop (void) {
     // Wait for start command
     while (state != STATE_RUN) {
         if (interrupt_called) {
-            //Serial.println("Interrupt called");
             Serial.print("State: ");
             Serial.println(state);
 
@@ -205,7 +206,6 @@ void loop (void) {
 
             if (print_info) {
                 game_rand.print_rand();
-                game_info.print_info();
                 print_info = false;
             }
         }
@@ -232,7 +232,9 @@ void loop (void) {
             Serial.println("This happens once every two seconds!");
             print_time = millis() + 2000;
         }
-        striked = Serial.available() and Serial.read() == 'x';
+        char c = Serial.read();
+        striked = c == 'x';
+        solved  = c == 'y';
 
         // End module code
 
@@ -241,6 +243,12 @@ void loop (void) {
             Serial.println("Striking");
             strikes++;
             set_state_spdr(state); // Update strikes in SPDR immediately
+        }
+
+        if (solved) {
+            Serial.println("Solved!");
+            set_state_spdr(STATE_SOLVED);
+            break;
         }
 
         // Debug stuff
@@ -254,6 +262,7 @@ void loop (void) {
                 print_info = false;
             }
         }
+
 
         // Deal with master strikes
         if (game_info.strikes >= 3) {
