@@ -84,8 +84,8 @@ void transfer_rand(int slave_idx) {
 }
 
 byte transfer_info(int slave_idx) {
-    // Copy rand data to buffer so as not to mutilate it
-    game_rand_t out_buf;
+    // Copy game info to buffer so as not to mutilate it
+    game_info_t out_buf;
     memcpy(&out_buf, &game_info, sizeof(game_info_t));
 
     digitalWrite(slave_pins[slave_idx], LOW);

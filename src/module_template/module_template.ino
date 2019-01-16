@@ -119,6 +119,7 @@ ISR (SPI_STC_vect) {
     int_debug.recv = c;
     if (state == STATE_UNREADY) {
         set_state_spdr(STATE_UNREADY);
+
     } else if (state == STATE_READY) {
         if (c == CMD_INIT) {
             set_state_spdr(STATE_READ_INIT);
@@ -129,6 +130,13 @@ ISR (SPI_STC_vect) {
         } else if (c == CMD_PING) {
             set_state_spdr(STATE_READY);
         }
+
+    } else if (state == STATE_RUN) {
+        if (c == CMD_INFO) {
+            set_state_spdr(STATE_READ_INFO);
+            pos = 0;
+        }
+        
     } else if (state == STATE_READ_INIT){
         // Copy over bytes to game_rand struct
         ((byte *)&game_rand)[pos] = c;
@@ -141,8 +149,10 @@ ISR (SPI_STC_vect) {
         } else {
             set_state_spdr(STATE_READ_INIT);
         }
+    
     } else if (state == STATE_READ_INFO){
         // Copy over bytes to game_info struct
+        Serial.println("Reached ISR read info");
         ((byte *)&game_info)[pos] = c;
         pos++;
 
@@ -186,7 +196,8 @@ void loop (void) {
     // Wait for start command
     while (state != STATE_RUN) {
         if (interrupt_called) {
-            Serial.println("Interrupt called");
+            //Serial.println("Interrupt called");
+            Serial.print("State: ");
             Serial.println(state);
 
             int_debug.print_interrupt();
@@ -240,7 +251,7 @@ void loop (void) {
             interrupt_called = false;
 
             if (print_info) {
-                game_rand.print_rand();
+                game_info.print_info();
                 print_info = false;
             }
         }
