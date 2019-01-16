@@ -70,7 +70,7 @@ void gen_rand() {
   game_rand.print_rand();
 }
 
-void tx_rand(int slave_idx) {
+void transfer_rand(int slave_idx) {
   // Copy rand data to buffer so as not to mutilate it
   game_rand_t out_buf;
   memcpy(&out_buf, &game_rand, sizeof(game_rand_t));
@@ -94,7 +94,7 @@ void loop (void) {
   Serial.println("Establishing connections");
   // Try to establish connection with each module a few times a second
   while (true) {
-    delay(100);
+    delay(20);
 
     for (int i = 0; i < NUM_MODULES; i++) {
       if (slave_on[i]) continue;
@@ -111,12 +111,25 @@ void loop (void) {
       if (rsp == RSP_READY) {
         Serial.print("Received READY from slave ");
         Serial.println(i);
-        slave_on[i] = true;
+        // For testing
+        //slave_on[i] = true;
 
         Serial.println("Sending INIT");
-        tx_rand(i);
+        transfer_rand(i);
       }
     }
+
+    // Break loop
+    if (Serial.available() > 0 && Serial.read() == 's') {
+      Serial.println("Breaking loop");
+      break;
+    }
+  }
+
+  while (true) {
+    delay(100);
+    
+
   }
 
  

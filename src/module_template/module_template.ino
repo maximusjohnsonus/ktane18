@@ -31,6 +31,7 @@ enum state_t {
 state_t state;
 byte pos;
 bool interrupt_called;
+bool print_info;
 
 struct interrupt_debug_t {
   byte recv; 
@@ -39,10 +40,17 @@ struct interrupt_debug_t {
   }
 
   void print_interrupt() {
-    Serial.println("Received SPI byte ");
+    Serial.print("Received SPI byte ");
     Serial.println(recv, BIN);
   }
 } int_debug;
+
+
+void get_miso() {
+  if (digitalRead(SS) == LOW) pinMode(MISO, OUTPUT); 
+  else pinMode(MISO, INPUT);
+
+}
 
 
 void setup (void) {
@@ -51,6 +59,7 @@ void setup (void) {
 
   // Don't grab MISO until selectesd
   pinMode(MISO, OUTPUT); //todo input
+  pinMode(SS, INPUT);
 
   // turn on SPI in slave mode
   SPCR |= _BV(SPE);
@@ -58,10 +67,15 @@ void setup (void) {
   // turn on interrupts
   SPCR |= _BV(SPIE);
 
+  // Set MISO to OUTPUT when SS goes LOW
+  // Docs say only pins 2 and 3 are usable 
+  attachInterrupt(digitalPinToInterrupt(SS), get_miso, CHANGE);
+
   strikes = 0;
   pos = 0;
   state = STATE_READY;
   interrupt_called = false;
+  print_info = false;
 }
 
 inline void update_spdr() {
@@ -82,12 +96,15 @@ ISR (SPI_STC_vect) {
     }
   }
   else if (state == STATE_READ_INIT){
+    // Copy over bytes to game_rand struct 
     ((char[])&game_rand)[pos] = c;
     ++pos;
     if (pos == sizeof(game_rand_t)) {
       pos = 0;
-      state = STATE_RUN;
-      game_rand.print_rand();
+      //state = STATE_RUN;
+      // For testing set it back to ping mode
+      state = STATE_READY;
+      print_info = true;
     }
   }
   
@@ -99,5 +116,10 @@ void loop (void) {
     int_debug.print_interrupt();
     int_debug.init();
     interrupt_called = false;
+
+    if (print_info) {
+      game_rand.print_rand();
+      print_info = false;
+    }
   }
 }
