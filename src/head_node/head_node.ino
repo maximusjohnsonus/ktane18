@@ -13,6 +13,9 @@
 game_rand_t game_rand;
 game_info_t game_info;
 
+unsigned long game_length; // Length of game (ms)
+unsigned long start_time;  // Time of game start (ms)
+
 // Pins
 // Pins for SS of each slave
 int slave_pins[NUM_MODULES] = {10, 11};
@@ -93,6 +96,14 @@ byte transfer_info(int slave_idx) {
     return rsp;
 }
 
+void update_game_time() {
+    unsigned long elapsed = millis() - start_time;
+    if (elapsed >= game_length) {
+        game_info.game_time = 0;
+    } else {
+        game_info.game_time = game_length - elapsed;
+    }
+}
 
 void loop(void) {
     Serial.println("Starting run");
@@ -102,7 +113,7 @@ void loop(void) {
 
     gen_rand();
     game_info.strikes = 0;
-    game_info.game_time = 300000; // 5 minutes
+    game_length = 300000; // 5 minutes
 
     Serial.println("Establishing connections");
     // Try to establish connection with each module a few times a second
@@ -142,11 +153,17 @@ void loop(void) {
         }
     }
 
+    Serial.println("Starting game");
+    start_time = millis();
+    update_game_time();
+
     while (true) {
         Serial.println("Updating modules");
 
         // Send each slave updates on the game state
         for(int i = 0; i < NUM_MODULES; i++){
+            update_game_time();
+
             byte rsp_raw = transfer_info(i);
 
             byte rsp_cmd = rsp_raw & (~STRIKE_MASK);
@@ -168,11 +185,16 @@ void loop(void) {
             break;
         }
 
+        if (game_info.game_time == 0) {
+            Serial.println("Timed out");
+            break;
+        }
+
         delay(1000);
     }
     Serial.println("Game over, informing slaves");
 
-    // Send one last update to all the slaves so they all know you striked
+    // Send one last update to all the slaves so they all know it's over
     for(int i = 0; i < NUM_MODULES; i++){
         transfer_info(i);
     }
