@@ -227,7 +227,7 @@ void loop(void) {
             break;
         }
 
-        delay(10000);
+        delay(1000);
     }
     Serial.println("Game over, informing slaves");
 

@@ -142,9 +142,10 @@ ISR (SPI_STC_vect) {
         if (c == CMD_INFO) {
             set_state_spdr(STATE_READ_INFO);
             pos = 0;
-        } else if (c == CMD_WON or c == CMD_LOST) {
+        } else if ((c == CMD_WON) or (c == CMD_LOST)) {
             set_state_spdr(STATE_GAME_OVER);
         }
+
     } else if (state == STATE_READ_INIT){
         // Copy over bytes to game_rand struct
         ((byte *)&game_rand)[pos] = c;
@@ -236,7 +237,7 @@ void loop (void) {
 
     // Play the game
     Serial.println("Starting game");
-    while(1){
+    while(state != STATE_GAME_OVER){
         // Time left on the game timer according to this module (ms)
         const unsigned long local_time = last_game_time - (millis() - last_info_time);
 
