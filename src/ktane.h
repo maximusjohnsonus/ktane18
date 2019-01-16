@@ -44,7 +44,7 @@ struct game_info_t {
         Serial.print("Strikes:");
         Serial.print(strikes);
         Serial.print(", time:");
-        Serial.println(game_time);
+        Serial.println(game_time, HEX);
     }
 };
 

@@ -158,7 +158,8 @@ void loop(void) {
     update_game_time();
 
     while (true) {
-        Serial.println("Updating modules");
+        Serial.print("Updating modules ");
+        game_info.print_info();
 
         // Send each slave updates on the game state
         for(int i = 0; i < NUM_MODULES; i++){

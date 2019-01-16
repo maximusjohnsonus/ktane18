@@ -152,7 +152,6 @@ ISR (SPI_STC_vect) {
     
     } else if (state == STATE_READ_INFO){
         // Copy over bytes to game_info struct
-        Serial.println("Reached ISR read info");
         ((byte *)&game_info)[pos] = c;
         pos++;
 
