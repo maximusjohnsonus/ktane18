@@ -166,12 +166,14 @@ void loop(void) {
     Serial.println("Starting game");
     start_time = millis();
     update_game_time();
+    bool solved = false;
 
     while (true) {
         Serial.print("Updating modules ");
         game_info.print_info();
 
         // Send each slave updates on the game state
+        solved = true; // Set to false if a module is unsolved
         for(int i = 0; i < NUM_MODULES; i++){
             update_game_time();
 
@@ -195,7 +197,23 @@ void loop(void) {
                     Serial.println(i);
                 }
                 slave_state[i] = STATE_SOLVED;
+            } else if (rsp_state == RSP_NEEDY) {
+                if (slave_state[i] != STATE_NEEDY) {
+                    Serial.print("Module is needy ");
+                    Serial.println(i);
+                }
+                slave_state[i] = STATE_NEEDY;
+            } else if (rsp_state == RSP_READY or rsp_state == RSP_ACTIVE) {
+                solved = false;
+            } else {
+                Serial.print("Weird response: 0x");
+                Serial.println(rsp_state, HEX);
             }
+        }
+
+        if (solved) {
+            Serial.println("Solved!");
+            break;
         }
 
         if (game_info.strikes >= 3) {
@@ -209,16 +227,19 @@ void loop(void) {
             break;
         }
 
-        delay(1000);
+        delay(10000);
     }
     Serial.println("Game over, informing slaves");
 
-    // Send one last update to all the slaves so they all know it's over
+    // Tell all slaves game is over
     for(int i = 0; i < NUM_MODULES; i++){
-        transfer_info(i);
+        digitalWrite(slave_pins[i], LOW);
+        delay(10);
+        SPI.transfer(solved ? CMD_WON : CMD_LOST);
+        digitalWrite(slave_pins[i], HIGH);
     }
 
     Serial.println("Done");
 
-    delay(2000);
+    delay(10000);
 }

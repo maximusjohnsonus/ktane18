@@ -13,11 +13,10 @@
 game_rand_t game_rand;
 game_info_t game_info; // Do not carelessly use game_time; it may be mid-update
                        // (Instead use last_game_time)
-volatile int pos;
+volatile int pos; // Position into whatever buffer master is sending data to
 
-
-// How many strikes the module has had
-byte strikes;
+byte strikes; // How many strikes the module has had
+bool solved;  // Whether this module is solved
 
 // Result of millis() when last info was completed
 volatile unsigned long last_info_time;
@@ -30,7 +29,8 @@ enum state_t {
     STATE_RUN,         // Game running
     STATE_READ_INIT,   // Reading init data from master (e.g. SN)
     STATE_READ_INFO,   // Reading info from master (time + strikes)
-    STATE_SOLVED       // Slave solved 
+    STATE_SOLVED,      // Slave solved
+    STATE_GAME_OVER    // Game is over
 };
 
 volatile state_t state;
@@ -104,6 +104,12 @@ void set_state_spdr(state_t new_state){
         case STATE_READ_INFO:
             spdr_new = RSP_ACTIVE;
             break;
+        case STATE_SOLVED:
+            spdr_new = RSP_SOLVED;
+            break;
+        case STATE_GAME_OVER:
+            spdr_new = RSP_UNREADY;
+            break;
     }
     spdr_new |= strikes;
 
@@ -136,8 +142,9 @@ ISR (SPI_STC_vect) {
         if (c == CMD_INFO) {
             set_state_spdr(STATE_READ_INFO);
             pos = 0;
+        } else if (c == CMD_WON or c == CMD_LOST) {
+            set_state_spdr(STATE_GAME_OVER);
         }
-        
     } else if (state == STATE_READ_INIT){
         // Copy over bytes to game_rand struct
         ((byte *)&game_rand)[pos] = c;
@@ -150,14 +157,14 @@ ISR (SPI_STC_vect) {
         } else {
             set_state_spdr(STATE_READ_INIT);
         }
-    
+
     } else if (state == STATE_READ_INFO){
         // Copy over bytes to game_info struct
         ((byte *)&game_info)[pos] = c;
         pos++;
 
         if (pos == sizeof(game_info_t)) {
-            set_state_spdr(STATE_RUN);
+            set_state_spdr(solved ? STATE_SOLVED : STATE_RUN);
 
             // Update our timing globals
             last_game_time = game_info.game_time;
@@ -168,6 +175,17 @@ ISR (SPI_STC_vect) {
         } else {
             set_state_spdr(STATE_READ_INFO);
         }
+    } else if (state == STATE_SOLVED) {
+        if (c == CMD_INFO) {
+            set_state_spdr(STATE_READ_INFO);
+            pos = 0;
+        } else if ((c == CMD_WON) or (c == CMD_LOST)) {
+            set_state_spdr(STATE_GAME_OVER);
+        } else {
+            set_state_spdr(STATE_SOLVED);
+        }
+    } else if (state == STATE_GAME_OVER) {
+        set_state_spdr(STATE_GAME_OVER);
     }
 
     interrupt_called = true;
@@ -183,7 +201,7 @@ void loop (void) {
     state = STATE_UNREADY;
     interrupt_called = false;
     print_info = false;
-    bool solved = false;
+    solved = false;
 
     //@TODO: your code
 
@@ -263,18 +281,25 @@ void loop (void) {
             }
         }
 
+        // // Deal with master strikes
+        // if (game_info.strikes >= 3) {
+        //     Serial.println("Striked out");
+        //     break;
+        // }
+        // if (last_game_time == 0) {
+        //     Serial.println("Ran out of time");
+        //     break;
+        // }
+    }
 
-        // Deal with master strikes
-        if (game_info.strikes >= 3) {
-            Serial.println("Striked out");
-            break;
-        }
-        if (last_game_time == 0) {
-            Serial.println("Ran out of time");
-            break;
-        }
+    // Wait for a game end signal
+    if (solved) {
+        Serial.println("Waiting for the game to end...");
+        while (state != STATE_GAME_OVER);
+    } else {
+        Serial.println("You Lost :(");
     }
 
     Serial.println("Game over");
-    delay(2000);
+    delay(10000);
 }

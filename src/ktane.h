@@ -11,6 +11,8 @@
 const byte CMD_PING = 0x01;
 const byte CMD_INIT = 0x02;
 const byte CMD_INFO = 0x03;
+const byte CMD_LOST = 0x04;
+const byte CMD_WON  = 0x05;
 
 // SPI responses
 const byte RSP_UNREADY = 0x10;
