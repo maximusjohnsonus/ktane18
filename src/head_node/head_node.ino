@@ -2,7 +2,7 @@
 // MOSI: 51 or ICSP-4
 // MISO: 50 or ICSP-1
 // SCK:  52 or ICSP-3
-// SS (slave): 10 
+// SS (slave): 10
 
 
 
@@ -24,113 +24,120 @@ unsigned long game_time;
 int slave_pins[NUM_MODULES] = {10};
 
 void setup (void) {
-  // Put SCK, MOSI, SS pins into output mode
-  // also put SCK, MOSI into LOW state, and SS into HIGH state.
-  // Then put SPI hardware into Master mode and turn SPI on
-  SPI.begin();
-  SPI.setClockDivider(SPI_CLOCK_DIV16);
-  
-  for(int i = 0; i < NUM_MODULES; i++){
-    pinMode(slave_pins[i], OUTPUT);
-    digitalWrite(slave_pins[i], HIGH);
-  }
+    // Put SCK, MOSI, SS pins into output mode
+    // also put SCK, MOSI into LOW state, and SS into HIGH state.
+    // Then put SPI hardware into Master mode and turn SPI on
+    SPI.begin();
+    SPI.setClockDivider(SPI_CLOCK_DIV16);
 
-  Serial.begin(9600);
-  Serial.println("HEAD v0.01 alpha");
+    for(int i = 0; i < NUM_MODULES; i++){
+        pinMode(slave_pins[i], OUTPUT);
+        digitalWrite(slave_pins[i], HIGH);
+    }
+
+    Serial.begin(9600);
+    Serial.println("HEAD v0.01 alpha");
 }
 
 void gen_rand() {
-  // TODO: seed random better (repeated readings? low-order bits?)
-  randomSeed(analogRead(A0));
+    // TODO: seed random better (repeated readings? low-order bits?)
+    randomSeed(analogRead(A0));
 
-  for (int i = 0; i < SN_LEN; i++) {
-    char c;
-    if (random(2) == 0) {
-      // Do a letter
-      c = random('A', 'Z' + 1);
-    } else {
-      // Do a number
-      c = random('0', '9' + 1);
+    for (int i = 0; i < SN_LEN; i++) {
+        char c;
+        if (random(2) == 0) {
+            // Do a letter
+            c = random('A', 'Z' + 1);
+        } else {
+            // Do a number
+            c = random('0', '9' + 1);
+        }
+        game_rand.sn[i] = c;
     }
-    game_rand.sn[i] = c;
-  }
-  for (int i = 0; i < MODEL_LEN; i++) {
-    char c;
-    if (random(2) == 0) {
-      // Do a letter
-      c = random('A', 'Z' + 1);
-    } else {
-      // Do a number
-      c = random('0', '9' + 1);
+    for (int i = 0; i < MODEL_LEN; i++) {
+        char c;
+        if (random(2) == 0) {
+            // Do a letter
+            c = random('A', 'Z' + 1);
+        } else {
+            // Do a number
+            c = random('0', '9' + 1);
+        }
+        game_rand.model[i] = c;
     }
-    game_rand.model[i] = c;
-  }
-  game_rand.indicators = random(256);
+    game_rand.indicators = random(256);
 
-  game_rand.print_rand();
+    game_rand.print_rand();
 }
 
 void transfer_rand(int slave_idx) {
-  // Copy rand data to buffer so as not to mutilate it
-  game_rand_t out_buf;
-  memcpy(&out_buf, &game_rand, sizeof(game_rand_t));
+    Serial.print("Transferring to ");
+    Serial.println(slave_idx);
 
-  digitalWrite(slave_pins[slave_idx], LOW);
-  SPI.transfer(CMD_INIT);
-  SPI.transfer(&out_buf, sizeof(game_rand_t));
-  digitalWrite(slave_pins[slave_idx], HIGH);
-  game_rand.print_rand();
+    // Copy rand data to buffer so as not to mutilate it
+    game_rand_t out_buf;
+    memcpy(&out_buf, &game_rand, sizeof(game_rand_t));
+
+    digitalWrite(slave_pins[slave_idx], LOW);
+    delay(10);
+    SPI.transfer(CMD_INIT);
+    SPI.transfer(&out_buf, sizeof(game_rand_t));
+    digitalWrite(slave_pins[slave_idx], HIGH);
+    game_rand.print_rand();
 }
 
 
 void loop (void) {
-  bool slave_on[NUM_MODULES] = {false};
-  byte num_strikes[NUM_MODULES] = {0};
+    bool slave_on[NUM_MODULES] = {};
+    byte num_strikes[NUM_MODULES] = {};
 
-  gen_rand();
-  strikes = 0;
-  game_time = 300000; // 5 minutes
+    gen_rand();
+    strikes = 0;
+    game_time = 300000; // 5 minutes
 
-  Serial.println("Establishing connections");
-  // Try to establish connection with each module a few times a second
-  while (true) {
-    delay(20);
+    Serial.println("Establishing connections");
+    // Try to establish connection with each module a few times a second
+    while (true) {
+        delay(2000);
 
-    for (int i = 0; i < NUM_MODULES; i++) {
-      if (slave_on[i]) continue;
+        for (int i = 0; i < NUM_MODULES; i++) {
+            Serial.print("Sending PING to slave ");
+            Serial.println(i);
 
-      Serial.print("Sending PING to slave ");
-      Serial.println(i);
+            digitalWrite(slave_pins[i], LOW);
+            delay(10);
+            byte rsp = SPI.transfer(CMD_PING);
+            digitalWrite(slave_pins[i], HIGH);
+            Serial.print("Received response ");
+            Serial.println(rsp, BIN);
 
-      digitalWrite(slave_pins[i], LOW);
-      byte rsp = SPI.transfer(CMD_PING);
-      digitalWrite(slave_pins[i], HIGH);
-      Serial.print("Received response ");
-      Serial.println(rsp, BIN);
+            if (rsp == RSP_READY) {
+                Serial.print("Received READY from slave ");
+                Serial.println(i);
 
-      if (rsp == RSP_READY) {
-        Serial.print("Received READY from slave ");
-        Serial.println(i);
-        // For testing
-        //slave_on[i] = true;
+                if (!slave_on[i]) {
+                    slave_on[i] = true;
 
-        Serial.println("Sending INIT");
-        transfer_rand(i);
-      }
+                    Serial.println("Sending INIT");
+                    transfer_rand(i);
+                }
+            } else {
+                slave_on[i] = false;
+            }
+        }
+
+        // Break loop
+        if (Serial.available() > 0 && Serial.read() == 's') {
+            Serial.println("Breaking loop");
+            break;
+        }
     }
 
-    // Break loop
-    if (Serial.available() > 0 && Serial.read() == 's') {
-      Serial.println("Breaking loop");
-      break;
+    while (true) {
+        delay(100);
+
+
     }
-  }
 
-  while (true) {
-    delay(100);
-    
 
-  }
-
- 
 }
