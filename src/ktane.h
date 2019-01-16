@@ -1,11 +1,11 @@
-// Global constants and info 
+// Global constants and info
 
 #ifndef KTANE_H
 #define KTANE_H
 
 #define SN_LEN 6
 #define MODEL_LEN 4
-#define NUM_MODULES 1
+#define NUM_MODULES 2
 
 // SPI Commands
 const byte CMD_PING = 0x01;
@@ -35,4 +35,4 @@ struct game_rand_t {
   }
 };
 
-#endif 
+#endif

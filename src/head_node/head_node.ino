@@ -2,7 +2,6 @@
 // MOSI: 51 or ICSP-4
 // MISO: 50 or ICSP-1
 // SCK:  52 or ICSP-3
-// SS (slave): 10
 
 
 
@@ -21,7 +20,7 @@ unsigned long game_time;
 
 // Pins
 // Pins for SS of each slave
-int slave_pins[NUM_MODULES] = {10};
+int slave_pins[NUM_MODULES] = {10, 11};
 
 void setup (void) {
     // Put SCK, MOSI, SS pins into output mode
