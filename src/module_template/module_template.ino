@@ -11,7 +11,9 @@
 #define SS_ISR_PIN 2
 
 game_rand_t game_rand;
-volatile int rand_idx;
+game_info_t game_info;
+volatile int pos;
+
 
 // How many strikes the module has had
 byte strikes;
@@ -32,8 +34,7 @@ enum state_t {
 };
 
 state_t state;
-byte pos;
-bool interrupt_called;
+volatile bool interrupt_called;
 bool print_info;
 
 struct interrupt_debug_t {
@@ -76,12 +77,6 @@ void setup (void) {
     // Set MISO to OUTPUT when SS goes LOW
     // Docs say only pins 2 and 3 are usable
     attachInterrupt(digitalPinToInterrupt(SS_ISR_PIN), get_miso, CHANGE);
-
-    strikes = 0;
-    pos = 0;
-    state = STATE_READY;
-    interrupt_called = false;
-    print_info = false;
 }
 
 // Update state and SPDR
@@ -120,9 +115,15 @@ ISR (SPI_STC_vect) {
                       // because we should always update it to the correct value
 
     int_debug.recv = c;
-    if (state == STATE_READY) {
+    if (state == STATE_UNREADY) {
+        set_state_spdr(STATE_UNREADY);
+    } else if (state == STATE_READY) {
         if (c == CMD_INIT) {
             set_state_spdr(STATE_READ_INIT);
+            pos = 0;
+        } else if (c == CMD_INFO) {
+            set_state_spdr(STATE_READ_INFO);
+            pos = 0;
         } else if (c == CMD_PING) {
             set_state_spdr(STATE_READY);
         }
@@ -138,20 +139,75 @@ ISR (SPI_STC_vect) {
         } else {
             set_state_spdr(STATE_READ_INIT);
         }
+    } else if (state == STATE_READ_INFO){
+        // Copy over bytes to game_info struct
+        ((byte *)&game_info)[pos] = c;
+        pos++;
+
+        if (pos == sizeof(game_info_t)) {
+            pos = 0;
+            set_state_spdr(STATE_RUN);
+            print_info = true;
+        } else {
+            set_state_spdr(STATE_READ_INFO);
+        }
     }
 
     interrupt_called = true;
 }
 
+// Each iteration of loop will be one game
 void loop (void) {
-    if (interrupt_called) {
-        int_debug.print_interrupt();
-        int_debug.init();
-        interrupt_called = false;
+    Serial.println("Starting run");
 
-        if (print_info) {
-            game_rand.print_rand();
-            print_info = false;
+    // Set up for each run
+    strikes = 0;
+    pos = 0;
+    state = STATE_UNREADY;
+    interrupt_called = false;
+    print_info = false;
+
+    // If necessary, wait until game is ready and in a valid physical state
+
+    // Done with set up, let master know
+    set_state_spdr(STATE_READY);
+
+    Serial.println("Done with setup, polling for start command");
+    // Wait for start command
+    while (state != STATE_RUN) {
+        if (interrupt_called) {
+            Serial.println("Interrupt called");
+
+            int_debug.print_interrupt();
+            int_debug.init();
+            interrupt_called = false;
+
+            if (print_info) {
+                game_rand.print_rand();
+                game_info.print_info();
+                print_info = false;
+            }
+        }
+    }
+
+    Serial.println("Starting game");
+
+    // Play the game
+    while(1){
+        if (Serial.available() and Serial.read() == 'x'){
+            Serial.println("Striking");
+            strikes++;
+        }
+
+        if (interrupt_called) {
+            int_debug.print_interrupt();
+            int_debug.init();
+            interrupt_called = false;
+
+            if (print_info) {
+                game_rand.print_rand();
+                print_info = false;
+            }
         }
     }
 }

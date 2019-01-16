@@ -11,12 +11,7 @@
 #include "ktane.h"
 
 game_rand_t game_rand;
-
-// How many strikes the game has had
-byte strikes;
-
-// Entire time of the game
-unsigned long game_time;
+game_info_t game_info;
 
 // Pins
 // Pins for SS of each slave
@@ -27,7 +22,7 @@ void setup (void) {
     // also put SCK, MOSI into LOW state, and SS into HIGH state.
     // Then put SPI hardware into Master mode and turn SPI on
     SPI.begin();
-    SPI.setClockDivider(SPI_CLOCK_DIV16);
+    SPI.setClockDivider(SPI_CLOCK_DIV32);
 
     for(int i = 0; i < NUM_MODULES; i++){
         pinMode(slave_pins[i], OUTPUT);
@@ -85,14 +80,29 @@ void transfer_rand(int slave_idx) {
     game_rand.print_rand();
 }
 
+byte transfer_info(int slave_idx) {
+    // Copy rand data to buffer so as not to mutilate it
+    game_rand_t out_buf;
+    memcpy(&out_buf, &game_info, sizeof(game_info_t));
 
-void loop (void) {
+    digitalWrite(slave_pins[slave_idx], LOW);
+    delay(10);
+    byte rsp = SPI.transfer(CMD_INIT);
+    SPI.transfer(&out_buf, sizeof(game_info_t));
+    digitalWrite(slave_pins[slave_idx], HIGH);
+    return rsp;
+}
+
+
+void loop(void) {
+    Serial.println("Starting run");
+
     bool slave_on[NUM_MODULES] = {};
     byte num_strikes[NUM_MODULES] = {};
 
     gen_rand();
-    strikes = 0;
-    game_time = 300000; // 5 minutes
+    game_info.strikes = 0;
+    game_info.game_time = 300000; // 5 minutes
 
     Serial.println("Establishing connections");
     // Try to establish connection with each module a few times a second
@@ -105,12 +115,15 @@ void loop (void) {
 
             digitalWrite(slave_pins[i], LOW);
             delay(10);
-            byte rsp = SPI.transfer(CMD_PING);
+            byte rsp_raw = SPI.transfer(CMD_PING);
             digitalWrite(slave_pins[i], HIGH);
             Serial.print("Received response ");
-            Serial.println(rsp, HEX);
+            Serial.println(rsp_raw, HEX);
 
-            if (rsp == RSP_READY) {
+            byte rsp_cmd = rsp_raw & (~STRIKE_MASK);
+            byte rsp_strikes = rsp_raw & STRIKE_MASK;
+
+            if (rsp_cmd == RSP_READY) {
                 if (!slave_on[i]) {
                     slave_on[i] = true;
 
@@ -130,10 +143,41 @@ void loop (void) {
     }
 
     while (true) {
-        delay(100);
+        Serial.println("Updating modules");
 
+        // Send each slave updates on the game state
+        for(int i = 0; i < NUM_MODULES; i++){
+            byte rsp_raw = transfer_info(i);
 
+            byte rsp_cmd = rsp_raw & (~STRIKE_MASK);
+            byte rsp_strikes = rsp_raw & STRIKE_MASK;
+
+            if (rsp_strikes > num_strikes[i]){
+                game_info.strikes++;
+                num_strikes[i]++;
+
+                Serial.print("Module ");
+                Serial.print(i);
+                Serial.println(" striked");
+            }
+        }
+
+        if (game_info.strikes >= 3) {
+            game_info.strikes = 3;
+            Serial.println("Striked out");
+            break;
+        }
+
+        delay(1000);
+    }
+    Serial.println("Game over, informing slaves");
+
+    // Send one last update to all the slaves so they all know you striked
+    for(int i = 0; i < NUM_MODULES; i++){
+        transfer_info(i);
     }
 
+    Serial.println("Done");
 
+    delay(2000);
 }

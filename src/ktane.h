@@ -22,18 +22,30 @@ const byte STRIKE_MASK = 0x03;
 
 // All the random components of this game
 struct game_rand_t {
-  char sn[SN_LEN];
-  char model[MODEL_LEN];
-  byte indicators;
+    char sn[SN_LEN];
+    char model[MODEL_LEN];
+    byte indicators;
 
-  void print_rand() {
-    Serial.write("SN:");
-    Serial.write((unsigned char*)sn, SN_LEN);
-    Serial.write(", Model:");
-    Serial.write((unsigned char*)model, MODEL_LEN);
-    Serial.write(", IND:");
-    Serial.println((int)indicators, BIN);
-  }
+    void print_rand() {
+        Serial.write("SN:");
+        Serial.write((unsigned char*)sn, SN_LEN);
+        Serial.write(", Model:");
+        Serial.write((unsigned char*)model, MODEL_LEN);
+        Serial.write(", IND:");
+        Serial.println((int)indicators, BIN);
+    }
+};
+
+struct game_info_t {
+    byte strikes; // How many strikes the game has had
+    unsigned long game_time; // Entire time of the game
+
+    void print_info() {
+        Serial.print("Strikes:");
+        Serial.print(strikes);
+        Serial.print(", time:");
+        Serial.println(game_time);
+    }
 };
 
 #endif
