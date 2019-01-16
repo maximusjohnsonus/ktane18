@@ -24,10 +24,11 @@ unsigned long millis_left;
 volatile int time_idx;
 
 enum state_t {
+    STATE_UNREADY,     // Game need some set up
     STATE_READY,       // Game hasn't started
     STATE_RUN,         // Game running
-    STATE_READ_INIT,
-    STATE_READ_INFO
+    STATE_READ_INIT,   // Reading init data from master (e.g. SN)
+    STATE_READ_INFO    // Reading info from master (time + strikes)
 };
 
 state_t state;
@@ -83,34 +84,61 @@ void setup (void) {
     print_info = false;
 }
 
-inline void update_spdr() {
-    SPDR |= strikes;
+// Update state and SPDR
+void set_state_spdr(state_t new_state){
+    state = new_state;
+    // Use spdr_new b/c reading SPDR changes it
+    byte spdr_new = RSP_DEBUG;
+
+    switch(state){
+        case STATE_UNREADY:
+            spdr_new = RSP_UNREADY;
+            break;
+        case STATE_READY:
+            spdr_new = RSP_READY;
+            break;
+        case STATE_RUN:
+            spdr_new = RSP_ACTIVE;
+            break;
+        case STATE_READ_INIT:
+            spdr_new = RSP_READY;
+            break;
+        case STATE_READ_INFO:
+            spdr_new = RSP_ACTIVE;
+            break;
+    }
+    spdr_new |= strikes;
+
+    SPDR = spdr_new;
 }
 
 // SPI interrupt routine
 // Serial communication can mess up interrupts, so store debug info elsewhere
 ISR (SPI_STC_vect) {
     byte c = SPDR;
+    SPDR = RSP_DEBUG; // We should ensure that RSP_DEBUG never stays in SPDR
+                      // because we should always update it to the correct value
+
     int_debug.recv = c;
     if (state == STATE_READY) {
         if (c == CMD_INIT) {
-            state = STATE_READ_INIT;
+            set_state_spdr(STATE_READ_INIT);
+        } else if (c == CMD_PING) {
+            set_state_spdr(STATE_READY);
         }
-    }
-    else if (state == STATE_READ_INIT){
+    } else if (state == STATE_READ_INIT){
         // Copy over bytes to game_rand struct
-        ((char[])&game_rand)[pos] = c;
-        ++pos;
+        ((byte *)&game_rand)[pos] = c;
+        pos++;
+
         if (pos == sizeof(game_rand_t)) {
             pos = 0;
-            //state = STATE_RUN;
-            // For testing set it back to ping mode
-            state = STATE_READY;
+            set_state_spdr(STATE_READY);
             print_info = true;
+        } else {
+            set_state_spdr(STATE_READ_INIT);
         }
     }
-
-    SPDR = RSP_READY;
 
     interrupt_called = true;
 }

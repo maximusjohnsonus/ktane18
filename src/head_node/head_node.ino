@@ -108,12 +108,9 @@ void loop (void) {
             byte rsp = SPI.transfer(CMD_PING);
             digitalWrite(slave_pins[i], HIGH);
             Serial.print("Received response ");
-            Serial.println(rsp, BIN);
+            Serial.println(rsp, HEX);
 
             if (rsp == RSP_READY) {
-                Serial.print("Received READY from slave ");
-                Serial.println(i);
-
                 if (!slave_on[i]) {
                     slave_on[i] = true;
 

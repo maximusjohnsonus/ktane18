@@ -11,12 +11,13 @@
 const byte CMD_PING = 0x01;
 const byte CMD_INIT = 0x02;
 const byte CMD_INFO = 0x03;
-//const byte STATUS = 0x40;
 
 // SPI responses
-const byte RSP_READY = 0x10;
-const byte RSP_ACTIVE = 0x20;
-const byte RSP_SOLVED = 0x30;
+const byte RSP_UNREADY = 0x10;
+const byte RSP_READY   = 0x20;
+const byte RSP_ACTIVE  = 0x30;
+const byte RSP_SOLVED  = 0x40;
+const byte RSP_DEBUG   = 0xF0;
 const byte STRIKE_MASK = 0x03;
 
 // All the random components of this game
