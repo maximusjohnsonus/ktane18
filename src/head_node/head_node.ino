@@ -15,6 +15,11 @@
 #include "pins_arduino.h"
 #include "ktane.h"
 
+#define STRIKE1_PIN 13
+#define STRIKE2_PIN 41
+#define STRIKE3_PIN 42
+
+
 game_rand_t game_rand;
 game_info_t game_info;
 
@@ -52,6 +57,12 @@ void setup (void) {
         pinMode(slave_pins[i], OUTPUT);
         digitalWrite(slave_pins[i], HIGH);
     }
+
+    // Set strike pins to output 
+    pinMode(STRIKE1_PIN, OUTPUT);
+    pinMode(STRIKE2_PIN, OUTPUT);
+    pinMode(STRIKE3_PIN, OUTPUT);
+
 
     Serial.begin(9600);
     Serial.println("HEAD v0.01 alpha");
@@ -110,17 +121,28 @@ byte transfer_byte(byte b, byte pin) {
     return rsp;
 }
 
+// Ensure strike LEDs match number of strikes
+void update_strike_leds(byte strikes) {
+    digitalWrite(STRIKE1_PIN, strikes >= 1 ? HIGH : LOW);
+    digitalWrite(STRIKE2_PIN, strikes >= 2 ? HIGH : LOW);
+    digitalWrite(STRIKE3_PIN, strikes >= 3 ? HIGH : LOW);
+}
+
 void loop(void) {
     // Every iteration of loop is ONE GAME
     Serial.println("Starting run");
 
-    // Init to 0
+    // Setting up initial game variables
     slave_state_t slave_state[NUM_MODULES] = {};
     byte num_strikes[NUM_MODULES] = {};
 
+    
     game_rand.gen_rand();
     game_info.strikes = 0;
     game_length = 300000; // 5 minutes
+
+    // Turn off all strike LEDs
+    update_strike_leds(game_info.strikes);
 
     // Display SN and Model on LCD
     lcd.home(); // set cursor to 0,0
@@ -171,9 +193,12 @@ void loop(void) {
     update_game_time();
     bool game_ended = false;
 
+    // Main game playing loop
     while (true) {
         Serial.print("Updating modules ");
         game_info.print_info();
+
+        update_strike_leds(game_info.strikes);        
 
         // Send each slave updates on the game state
         game_ended = true; // Set to false if a module is unsolved
