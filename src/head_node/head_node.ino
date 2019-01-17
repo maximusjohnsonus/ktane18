@@ -1,11 +1,17 @@
+// Master module
 // Mega pins
 // MOSI: 51 or ICSP-4
 // MISO: 50 or ICSP-1
 // SCK:  52 or ICSP-3
 
+// Requires special LCD library for PCF8574 I2C LCD Backpack
+// https://bitbucket.org/fmalpartida/new-liquidcrystal/downloads 
+// GNU General Public License, version 3 (GPL-3.0)
 
 #include <SPI.h>
 #include <Wire.h>
+#include <LCD.h>
+#include <LiquidCrystal_I2C.h>
 #include "pins_arduino.h"
 #include "ktane.h"
 
@@ -25,17 +31,23 @@ enum slave_state_t {
 };
 
 
-// Pins
 // Pins for SS of each slave
 int slave_pins[NUM_MODULES] = {10, 11};
+
+// 0x27 is the I2C bus address for an unmodified backpack
+LiquidCrystal_I2C  lcd(0x27,2,1,0,4,5,6,7); 
+
 
 void setup (void) {
     // Put SCK, MOSI, SS pins into output mode
     // also put SCK, MOSI into LOW state, and SS into HIGH state.
     // Then put SPI hardware into Master mode and turn SPI on
     SPI.begin();
+
+    // Set clock slow enough for all multi-byte transfers
     SPI.setClockDivider(SPI_CLOCK_DIV32);
 
+    // Set slave pins to output
     for(int i = 0; i < NUM_MODULES; i++){
         pinMode(slave_pins[i], OUTPUT);
         digitalWrite(slave_pins[i], HIGH);
@@ -43,23 +55,14 @@ void setup (void) {
 
     Serial.begin(9600);
     Serial.println("HEAD v0.01 alpha");
+
+    // activate LCD module
+    lcd.begin (16,2); // for 16 x 2 LCD module
+    lcd.setBacklightPin(3,POSITIVE);
+    lcd.setBacklight(HIGH);
 }
 
-void gen_rand() {
-    // TODO: seed random better (repeated readings? low-order bits?)
-    randomSeed(analogRead(A0));
 
-    for (int i = 0; i < SN_LEN; i++) {
-        game_rand.sn[i] = random(2) ? random('0', '9'+1) 
-                                    : random('A', 'Z'+1);
-    }
-    for (int i = 0; i < MODEL_LEN; i++) {
-        game_rand.model[i] = random(2) ? random('0', '9'+1)
-                                       : random('A', 'Z'+1);
-    }
-    game_rand.indicators = random(256);
-    game_rand.print_rand();
-}
 
 void transfer_rand(int slave_idx) {
     Serial.print("Transferring to ");
@@ -108,14 +111,25 @@ byte transfer_byte(byte b, byte pin) {
 }
 
 void loop(void) {
+    // Every iteration of loop is ONE GAME
     Serial.println("Starting run");
 
+    // Init to 0
     slave_state_t slave_state[NUM_MODULES] = {};
     byte num_strikes[NUM_MODULES] = {};
 
-    gen_rand();
+    game_rand.gen_rand();
     game_info.strikes = 0;
     game_length = 300000; // 5 minutes
+
+    // Display SN and Model on LCD
+    lcd.home(); // set cursor to 0,0
+    lcd.print("SN: ");
+    lcd.print(game_rand.sn);
+    lcd.setCursor (0,1);        // go to start of 2nd line
+    lcd.print("Model: ");
+    lcd.print(game_rand.model);
+
 
     Serial.println("Establishing connections");
     // Try to establish connection with each module a few times a second

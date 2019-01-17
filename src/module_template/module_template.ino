@@ -1,8 +1,11 @@
+// Slave module
 // Uno pins
 // MOSI: 11 or ICSP-4
 // MISO: 12 or ICSP-1
 // SCK:  13 or ICSP-3
 // SS (slave): 10
+// Interrupt: 2 (connect directly to 10) 
+
 
 #include <Wire.h>
 #include "pins_arduino.h"
