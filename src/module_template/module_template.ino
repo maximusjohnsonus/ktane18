@@ -39,9 +39,7 @@ volatile bool print_info;
 
 struct interrupt_debug_t {
     byte recv;
-    void init() {
-        recv = -1;
-    }
+    void init() { recv = -1; }
 
     void print_interrupt() {
         Serial.print("Received SPI byte ");

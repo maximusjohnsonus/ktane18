@@ -4,7 +4,6 @@
 // SCK:  52 or ICSP-3
 
 
-
 #include <SPI.h>
 #include <Wire.h>
 #include "pins_arduino.h"
@@ -51,29 +50,14 @@ void gen_rand() {
     randomSeed(analogRead(A0));
 
     for (int i = 0; i < SN_LEN; i++) {
-        char c;
-        if (random(2) == 0) {
-            // Do a letter
-            c = random('A', 'Z' + 1);
-        } else {
-            // Do a number
-            c = random('0', '9' + 1);
-        }
-        game_rand.sn[i] = c;
+        game_rand.sn[i] = random(2) ? random('0', '9'+1) 
+                                    : random('A', 'Z'+1);
     }
     for (int i = 0; i < MODEL_LEN; i++) {
-        char c;
-        if (random(2) == 0) {
-            // Do a letter
-            c = random('A', 'Z' + 1);
-        } else {
-            // Do a number
-            c = random('0', '9' + 1);
-        }
-        game_rand.model[i] = c;
+        game_rand.model[i] = random(2) ? random('0', '9'+1)
+                                       : random('A', 'Z'+1);
     }
     game_rand.indicators = random(256);
-
     game_rand.print_rand();
 }
 
@@ -115,6 +99,14 @@ void update_game_time() {
     }
 }
 
+byte transfer_byte(byte b, byte pin) {
+    digitalWrite(slave_pins[pin], LOW);
+    delay(10);
+    byte rsp = SPI.transfer(b);
+    digitalWrite(slave_pins[pin], HIGH);
+    return rsp;
+}
+
 void loop(void) {
     Serial.println("Starting run");
 
@@ -134,10 +126,7 @@ void loop(void) {
             Serial.print("Sending PING to slave ");
             Serial.println(i);
 
-            digitalWrite(slave_pins[i], LOW);
-            delay(10);
-            byte rsp_raw = SPI.transfer(CMD_PING);
-            digitalWrite(slave_pins[i], HIGH);
+            byte rsp_raw = transfer_byte(CMD_PING, i);
             Serial.print("Received response ");
             Serial.println(rsp_raw, HEX);
 
@@ -166,14 +155,14 @@ void loop(void) {
     Serial.println("Starting game");
     start_time = millis();
     update_game_time();
-    bool solved = false;
+    bool game_ended = false;
 
     while (true) {
         Serial.print("Updating modules ");
         game_info.print_info();
 
         // Send each slave updates on the game state
-        solved = true; // Set to false if a module is unsolved
+        game_ended = true; // Set to false if a module is unsolved
         for(int i = 0; i < NUM_MODULES; i++){
             update_game_time();
 
@@ -204,14 +193,15 @@ void loop(void) {
                 }
                 slave_state[i] = STATE_NEEDY;
             } else if (rsp_state == RSP_READY or rsp_state == RSP_ACTIVE) {
-                solved = false;
+                game_ended = false; 
             } else {
-                Serial.print("Weird response: 0x");
+                Serial.print(i);
+                Serial.print(": Weird response: 0x");
                 Serial.println(rsp_state, HEX);
             }
         }
 
-        if (solved) {
+        if (game_ended) {
             Serial.println("Solved!");
             break;
         }
@@ -233,10 +223,7 @@ void loop(void) {
 
     // Tell all slaves game is over
     for(int i = 0; i < NUM_MODULES; i++){
-        digitalWrite(slave_pins[i], LOW);
-        delay(10);
-        SPI.transfer(solved ? CMD_WON : CMD_LOST);
-        digitalWrite(slave_pins[i], HIGH);
+        transfer_byte(game_ended ? CMD_WON : CMD_LOST, i);
     }
 
     Serial.println("Done");
