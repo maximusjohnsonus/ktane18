@@ -77,6 +77,7 @@ struct game_info_t {
 enum module_type_t {
     MODULE_SAMPLE,
     MODULE_KNOCK,
+    MODULE_SWITCHES,
 };
 
 
