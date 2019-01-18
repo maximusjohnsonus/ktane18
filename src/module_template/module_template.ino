@@ -13,6 +13,7 @@
 
 // Pins
 #define SS_ISR_PIN 2
+#define WIN_PIN 8
 #define KNOCK_PIN A0 
 
 byte SWITCHES_SW_PINS[5]   = {3, 4, 5, 6, 7};
@@ -28,7 +29,9 @@ const int knock_maxs[2] = {500, 1500};
 byte knock_p;
 
 // Which module is this?
-#define MODULE_TYPE MODULE_SWITCHES
+#define MODULE_TYPE MODULE_KNOCK
+
+//#define HEADLESS 
 
 // Constants
 #define KNOCK_THRESHOLD 50  
@@ -141,6 +144,7 @@ ISR (SPI_STC_vect) {
             set_state_spdr(STATE_READ_INIT);
             pos = 0;
         } else if (c == CMD_INFO) {
+        digitalWrite(WIN_PIN, LOW); // Not win
             set_state_spdr(STATE_READ_INFO);
             pos = 0;
         } else if (c == CMD_PING) {
@@ -209,6 +213,7 @@ void setup (void) {
     pinMode(MISO, INPUT);
     pinMode(SS, INPUT);
     pinMode(SS_ISR_PIN, INPUT);
+    pinMode(WIN_PIN, OUTPUT);
 
     // turn on SPI in slave mode
     SPCR |= _BV(SPE);
@@ -269,6 +274,11 @@ void loop (void) {
     set_state_spdr(STATE_READY);
 
     Serial.println("Done with setup, polling for start command");
+    
+    #ifdef HEADLESS
+    //    set_state_spdr(STATE_RUN);
+    #endif
+    
     // Wait for start command
     while (state != STATE_RUN) {
         if (interrupt_called) {
@@ -297,6 +307,9 @@ void loop (void) {
         knock_p = 1;
         Serial.print("Using knock pattern ");
         Serial.println(knock_p);
+
+
+        digitalWrite(WIN_PIN, LOW); // Not win
     }
 
     if (MODULE_TYPE == MODULE_SWITCHES)
@@ -321,6 +334,7 @@ void loop (void) {
     while(state != STATE_GAME_OVER){
         // Time left on the game timer according to this module (ms)
         const unsigned long local_time = last_game_time - (millis() - last_info_time);
+        
 
         // Read from Serial for debugging 
         char c = Serial.read();
@@ -403,6 +417,7 @@ void loop (void) {
         if (solved) {
             Serial.println("Solved!");
             set_state_spdr(STATE_SOLVED);
+            digitalWrite(WIN_PIN, HIGH);
             break;
         }
 

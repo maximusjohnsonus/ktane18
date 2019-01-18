@@ -5,7 +5,7 @@
 
 #define SN_LEN 6
 #define MODEL_LEN 4
-#define NUM_MODULES 2
+#define NUM_MODULES 1
 
 // SPI Commands
 const byte CMD_PING = 0x01;

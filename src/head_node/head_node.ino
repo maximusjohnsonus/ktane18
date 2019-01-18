@@ -43,7 +43,7 @@ enum slave_state_t {
 
 
 // Pins for SS of each slave
-int slave_pins[NUM_MODULES] = {10, 11};
+int slave_pins[NUM_MODULES] = {10};
 
 // 0x27 is the I2C bus address for an unmodified backpack
 LiquidCrystal_I2C  lcd(0x27,2,1,0,4,5,6,7); 
