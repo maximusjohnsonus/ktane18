@@ -7,21 +7,26 @@
 // Requires special LCD library for PCF8574 I2C LCD Backpack
 // https://bitbucket.org/fmalpartida/new-liquidcrystal/downloads 
 // GNU General Public License, version 3 (GPL-3.0)
+// Requires Adafruit LED Backpack Library
 
 #include <SPI.h>
 #include <Wire.h>
 #include <LCD.h>
 #include <LiquidCrystal_I2C.h>
+#include <Adafruit_GFX.h>
 #include "pins_arduino.h"
 #include "ktane.h"
+#include "Adafruit_LEDBackpack.h"
 
 #define STRIKE1_PIN 40
 #define STRIKE2_PIN 41
 #define STRIKE3_PIN 42
+#define TIMER_ADDRESS 0x74
 
 
 game_rand_t game_rand;
 game_info_t game_info;
+Adafruit_7segment matrix = Adafruit_7segment();
 
 unsigned long game_length; // Length of game (ms)
 unsigned long start_time;  // Time of game start (ms)
@@ -41,37 +46,6 @@ int slave_pins[NUM_MODULES] = {10, 11};
 
 // 0x27 is the I2C bus address for an unmodified backpack
 LiquidCrystal_I2C  lcd(0x27,2,1,0,4,5,6,7); 
-
-
-void setup (void) {
-    // Put SCK, MOSI, SS pins into output mode
-    // also put SCK, MOSI into LOW state, and SS into HIGH state.
-    // Then put SPI hardware into Master mode and turn SPI on
-    SPI.begin();
-
-    // Set clock slow enough for all multi-byte transfers
-    SPI.setClockDivider(SPI_CLOCK_DIV32);
-
-    // Set slave pins to output
-    for(int i = 0; i < NUM_MODULES; i++){
-        pinMode(slave_pins[i], OUTPUT);
-        digitalWrite(slave_pins[i], HIGH);
-    }
-
-    // Set strike pins to output 
-    pinMode(STRIKE1_PIN, OUTPUT);
-    pinMode(STRIKE2_PIN, OUTPUT);
-    pinMode(STRIKE3_PIN, OUTPUT);
-
-
-    Serial.begin(9600);
-    Serial.println("HEAD v0.01 alpha");
-
-    // activate LCD module
-    lcd.begin (16,2); // for 16 x 2 LCD module
-    lcd.setBacklightPin(3,POSITIVE);
-    lcd.setBacklight(HIGH);
-}
 
 
 
@@ -128,6 +102,54 @@ void update_strike_leds(byte strikes) {
     digitalWrite(STRIKE3_PIN, strikes >= 3 ? HIGH : LOW);
 }
 
+void update_timer(unsigned long time_ms) {
+    unsigned long time_s = time_ms / 1000;
+    byte mins = time_s / 60;
+    byte secs = time_s % 60;
+    matrix.writeDigitNum(0, mins / 10);
+    matrix.writeDigitNum(1, mins % 10);
+    matrix.drawColon(true);
+    matrix.writeDigitNum(3, secs / 10);
+    matrix.writeDigitNum(4, secs % 10);
+    matrix.writeDisplay();
+}
+
+void setup (void) {
+    // Put SCK, MOSI, SS pins into output mode
+    // also put SCK, MOSI into LOW state, and SS into HIGH state.
+    // Then put SPI hardware into Master mode and turn SPI on
+    SPI.begin();
+
+    // Set clock slow enough for all multi-byte transfers
+    SPI.setClockDivider(SPI_CLOCK_DIV32);
+
+    // Set slave pins to output
+    for(int i = 0; i < NUM_MODULES; i++){
+        pinMode(slave_pins[i], OUTPUT);
+        digitalWrite(slave_pins[i], HIGH);
+    }
+
+    // Set strike pins to output 
+    pinMode(STRIKE1_PIN, OUTPUT);
+    pinMode(STRIKE2_PIN, OUTPUT);
+    pinMode(STRIKE3_PIN, OUTPUT);
+
+
+    Serial.begin(9600);
+    Serial.println("HEAD v0.01 alpha");
+
+    // activate LCD module
+    lcd.begin (16,2); // for 16 x 2 LCD module
+    lcd.setBacklightPin(3,POSITIVE);
+    lcd.setBacklight(HIGH);
+
+    // activate timer
+    matrix.begin(TIMER_ADDRESS);
+}
+
+
+
+
 void loop(void) {
     // Every iteration of loop is ONE GAME
     Serial.println("Starting run");
@@ -152,6 +174,9 @@ void loop(void) {
     lcd.print("Model: ");
     lcd.print(game_rand.model);
 
+    // Show starting time
+    update_game_time();
+    update_timer(game_info.game_time);
 
     Serial.println("Establishing connections");
     // Try to establish connection with each module a few times a second
@@ -198,7 +223,9 @@ void loop(void) {
         Serial.print("Updating modules ");
         game_info.print_info();
 
+        // Update master displays
         update_strike_leds(game_info.strikes);        
+        update_timer(game_info.game_time);
 
         // Send each slave updates on the game state
         game_ended = true; // Set to false if a module is unsolved
