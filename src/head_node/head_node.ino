@@ -15,7 +15,7 @@
 #include "pins_arduino.h"
 #include "ktane.h"
 
-#define STRIKE1_PIN 13
+#define STRIKE1_PIN 40
 #define STRIKE2_PIN 41
 #define STRIKE3_PIN 42
 
@@ -258,6 +258,7 @@ void loop(void) {
 
         delay(1000);
     }
+    update_strike_leds(game_info.strikes);
     Serial.println("Game over, informing slaves");
 
     // Tell all slaves game is over

@@ -21,6 +21,9 @@ const byte RSP_ACTIVE  = 0x30;
 const byte RSP_NEEDY   = 0x40;
 const byte RSP_SOLVED  = 0x50;
 const byte RSP_DEBUG   = 0xF0;
+
+
+// Useful others
 const byte STRIKE_MASK = 0x03;
 
 // All the random components of this game
@@ -70,5 +73,11 @@ struct game_info_t {
         Serial.println(game_time, HEX);
     }
 };
+
+enum module_type_t {
+    MODULE_SAMPLE,
+    MODULE_KNOCK,
+};
+
 
 #endif

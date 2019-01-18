@@ -11,7 +11,15 @@
 #include "pins_arduino.h"
 #include "ktane.h"
 
+// Pins
 #define SS_ISR_PIN 2
+#define KNOCK_PIN A0 
+
+// Which module is this?
+#define MODULE_TYPE MODULE_KNOCK
+
+// Constants
+#define KNOCK_THRESHOLD 50  
 
 game_rand_t game_rand;
 game_info_t game_info; // Do not carelessly use game_time; it may be mid-update
@@ -204,6 +212,10 @@ void loop (void) {
     interrupt_called = false;
     print_info = false;
     solved = false;
+    bool striked = false;
+    
+    unsigned long last_knock = 0;
+    byte successful_knocks = 0;
 
     //@TODO: your code
 
@@ -242,9 +254,46 @@ void loop (void) {
         // Time left on the game timer according to this module (ms)
         const unsigned long local_time = last_game_time - (millis() - last_info_time);
 
-        // Set this to true if the module strikes on this loop
-        bool striked = false;
+        // Read from Serial for debugging 
+        char c = Serial.read();
+        striked = c == 'x';
+        solved  = c == 'y';
+        
+        #if MODULE_TYPE == MODULE_KNOCK
+            const byte KNOCKS_TO_WIN = 4;
 
+            if (analogRead(KNOCK_PIN) > KNOCK_THRESHOLD) {
+                unsigned long now = millis();
+                Serial.print(now);
+                Serial.println("Knock!");
+                
+                if (now - last_knock > 200) {  // This knock isn't bounce
+                    if (now - last_knock < 500) { // Too soon
+                        Serial.println("Knock too soon");
+                        successful_knocks = 0;
+                    }
+                    else if (now - last_knock < 1500) { // Good knock
+                        successful_knocks++;
+                        Serial.print("Good knock! You have ");
+                        Serial.print(successful_knocks);
+                        Serial.println(" successful knocks!");
+                    }
+                    else { // Knock too late, reset
+                        Serial.println("Knock too late");
+                        successful_knocks = 0;
+                    }
+                    last_knock = now;
+                }    
+            }
+            
+            // Initial knock not counted as successful knock
+            if (successful_knocks == KNOCKS_TO_WIN-1) {
+                Serial.println("Good knocking!");
+                solved = true;
+            }
+
+        #endif
+        
         // Module code here. DO NOT USE DELAY pls I think it will break things
         //@TODO: your code
         // example:
@@ -252,9 +301,7 @@ void loop (void) {
             Serial.println("This happens once every two seconds!");
             print_time = millis() + 2000;
         }
-        char c = Serial.read();
-        striked = c == 'x';
-        solved  = c == 'y';
+
 
         // End module code
 
@@ -283,15 +330,6 @@ void loop (void) {
             }
         }
 
-        // // Deal with master strikes
-        // if (game_info.strikes >= 3) {
-        //     Serial.println("Striked out");
-        //     break;
-        // }
-        // if (last_game_time == 0) {
-        //     Serial.println("Ran out of time");
-        //     break;
-        // }
     }
 
     // Wait for a game end signal
