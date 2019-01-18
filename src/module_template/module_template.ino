@@ -215,7 +215,7 @@ void loop (void) {
     bool striked = false;
     
     unsigned long last_knock = 0;
-    byte successful_knocks = 0;
+    byte good_knocks = 0;
 
     //@TODO: your code
 
@@ -248,6 +248,22 @@ void loop (void) {
     // example:
     unsigned long print_time = millis() + 2000;
 
+    #if MODULE_TYPE == MODULE_KNOCK 
+        const byte KNOCKS_TO_WIN = 4;
+        const byte KNOCK_PATTERNS[2][KNOCKS_TO_WIN-1] = 
+            {{0, 0, 0}, {0, 1, 0}};
+        const int knock_mins[2] = {300, 700};
+        const int knock_maxs[2] = {500, 1500};
+
+        // Pick a knock pattern based on SN
+        byte knock_p = 
+            ('0' <= game_rand.sn[0] && game_rand.sn[0] <= '9');
+        knock_p = 1;
+        Serial.print("Using knock pattern ");
+        Serial.println(knock_p);
+    #endif
+
+
     // Play the game
     Serial.println("Starting game");
     while(state != STATE_GAME_OVER){
@@ -260,34 +276,36 @@ void loop (void) {
         solved  = c == 'y';
         
         #if MODULE_TYPE == MODULE_KNOCK
-            const byte KNOCKS_TO_WIN = 4;
-
             if (analogRead(KNOCK_PIN) > KNOCK_THRESHOLD) {
                 unsigned long now = millis();
                 Serial.print(now);
-                Serial.println("Knock!");
+                Serial.println(" Knock!");
+                byte knock_i = KNOCK_PATTERNS[knock_p][good_knocks];
                 
                 if (now - last_knock > 200) {  // This knock isn't bounce
-                    if (now - last_knock < 500) { // Too soon
+                    if (now - last_knock < knock_mins[knock_i]) {
+                        // Too soon
                         Serial.println("Knock too soon");
-                        successful_knocks = 0;
+                        good_knocks = 0;
                     }
-                    else if (now - last_knock < 1500) { // Good knock
-                        successful_knocks++;
+                    else if (now - last_knock < knock_maxs[knock_i]) { 
+                        // Good knock
+                        good_knocks++;
                         Serial.print("Good knock! You have ");
-                        Serial.print(successful_knocks);
+                        Serial.print(good_knocks);
                         Serial.println(" successful knocks!");
                     }
-                    else { // Knock too late, reset
+                    else { 
+                        // Knock too late, reset
                         Serial.println("Knock too late");
-                        successful_knocks = 0;
+                        good_knocks = 0;
                     }
                     last_knock = now;
                 }    
             }
             
             // Initial knock not counted as successful knock
-            if (successful_knocks == KNOCKS_TO_WIN-1) {
+            if (good_knocks == KNOCKS_TO_WIN-1) {
                 Serial.println("Good knocking!");
                 solved = true;
             }
