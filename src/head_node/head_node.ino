@@ -21,6 +21,7 @@
 #define STRIKE1_PIN 40
 #define STRIKE2_PIN 41
 #define STRIKE3_PIN 42
+#define START_BUTTON_PIN 30
 #define TIMER_ADDRESS 0x74
 
 
@@ -133,6 +134,8 @@ void setup (void) {
     pinMode(STRIKE1_PIN, OUTPUT);
     pinMode(STRIKE2_PIN, OUTPUT);
     pinMode(STRIKE3_PIN, OUTPUT);
+    
+    pinMode(START_BUTTON_PIN, INPUT);
 
 
     Serial.begin(9600);
@@ -207,7 +210,8 @@ void loop(void) {
         }
 
         // Break loop
-        if (Serial.available() > 0 && Serial.read() == 's') {
+        if ((Serial.available() > 0 && Serial.read() == 's') ||
+            digitalRead(START_BUTTON_PIN) == LOW) {
             Serial.println("Breaking loop");
             break;
         }
@@ -285,7 +289,6 @@ void loop(void) {
 
         delay(1000);
     }
-    update_strike_leds(game_info.strikes);
     Serial.println("Game over, informing slaves");
 
     // Tell all slaves game is over
