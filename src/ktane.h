@@ -51,4 +51,20 @@ struct game_info_t {
     }
 };
 
+void seed_rand() {
+    int seed = 0;
+    int pin = 0; // analogRead(0) == analogRead(A0), digitalRead(0) != digitalRead(A0)
+
+    for (int i = 0; i < 16; i++) {
+        seed = (seed << 1) | (analogRead(pin) & 0x1);
+        if (pin == A5) {
+            pin = A0;
+        } else {
+            pin++;
+        }
+    }
+
+    randomSeed(seed);
+}
+
 #endif

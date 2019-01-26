@@ -47,8 +47,7 @@ void setup (void) {
 }
 
 void gen_rand() {
-    // TODO: seed random better (repeated readings? low-order bits?)
-    randomSeed(analogRead(A0));
+    seed_rand();
 
     for (int i = 0; i < SN_LEN; i++) {
         char c;
