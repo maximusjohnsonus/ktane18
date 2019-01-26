@@ -5,7 +5,7 @@
 
 #define SN_LEN 6
 #define MODEL_LEN 4
-#define NUM_MODULES 2
+#define NUM_MODULES 1
 
 // SPI Commands
 const byte CMD_PING = 0x01;
@@ -21,12 +21,15 @@ const byte RSP_ACTIVE  = 0x30;
 const byte RSP_NEEDY   = 0x40;
 const byte RSP_SOLVED  = 0x50;
 const byte RSP_DEBUG   = 0xF0;
+
+
+// Useful others
 const byte STRIKE_MASK = 0x03;
 
 // All the random components of this game
 struct game_rand_t {
-    char sn[SN_LEN];
-    char model[MODEL_LEN];
+    char sn[SN_LEN+1];
+    char model[MODEL_LEN+1];
     byte indicators;
 
     void print_rand() {
@@ -36,6 +39,26 @@ struct game_rand_t {
         Serial.write((unsigned char*)model, MODEL_LEN);
         Serial.write(", IND:");
         Serial.println((int)indicators, BIN);
+    }
+
+    void gen_rand() {
+        // TODO: seed random better (repeated readings? low-order bits?)
+        randomSeed(analogRead(A0));
+
+        for (int i = 0; i < SN_LEN; i++) {
+            sn[i] = random(2) ? random('0', '9'+1)
+                              : random('A', 'Z'+1);
+        }
+        sn[SN_LEN] = '\0';
+
+        for (int i = 0; i < MODEL_LEN; i++) {
+            model[i] = random(2) ? random('0', '9'+1)
+                                 : random('A', 'Z'+1);
+        }
+        model[MODEL_LEN] = '\0';
+
+        indicators = random(256);
+        print_rand();
     }
 };
 
@@ -66,5 +89,11 @@ void seed_rand() {
 
     randomSeed(seed);
 }
+
+enum module_type_t {
+    MODULE_SAMPLE,
+    MODULE_KNOCK,
+    MODULE_SWITCHES,
+};
 
 #endif
