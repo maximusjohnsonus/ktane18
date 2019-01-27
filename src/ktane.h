@@ -79,6 +79,8 @@ void seed_rand() {
     int pin = 0; // analogRead(0) == analogRead(A0), digitalRead(0) != digitalRead(A0)
 
     for (int i = 0; i < 16; i++) {
+        delay(6); // Chosen by fair dice roll. Guaranteed to be random.
+
         seed = (seed << 1) | (analogRead(pin) & 0x1);
         if (pin == A5) {
             pin = A0;
