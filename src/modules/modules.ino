@@ -12,7 +12,8 @@
 #include "ktane.h"
 
 // Module to import
-#include "MODULE"
+
+#include "test_module.h"
 
 // Pins
 #define SS_ISR_PIN 2
@@ -251,7 +252,7 @@ void loop (void) {
         const unsigned long local_time = last_game_time - (millis() - last_info_time);
 
         // Call module code
-        module_loop(local_time, &striked, &solved)
+        module_loop(local_time, &striked, &solved);
 
         // Deal with strikes
         if (striked) {

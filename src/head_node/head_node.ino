@@ -7,13 +7,12 @@
 // Requires special LCD library for PCF8574 I2C LCD Backpack
 // https://bitbucket.org/fmalpartida/new-liquidcrystal/downloads
 // GNU General Public License, version 3 (GPL-3.0)
-// Requires Adafruit LED Backpack Library
+// Requires Adafruit LED Backpack and GFX libraries
 
 #include <SPI.h>
 #include <Wire.h>
 #include <LCD.h>
 #include <LiquidCrystal_I2C.h>
-#include <Adafruit_GFX.h>
 #include "pins_arduino.h"
 #include "ktane.h"
 #include "Adafruit_LEDBackpack.h"
